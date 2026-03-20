@@ -59,6 +59,24 @@ const NEIGHBORHOODS = [
   { name: 'Salvador Centro', lat: -12.9400, lng: -38.4700, aliases: ['salvador'] },
 ];
 
+// Inland-only neighborhoods for random assignment (exclude coastal ones that risk ocean placement)
+const INLAND_NEIGHBORHOODS = NEIGHBORHOODS.filter(n =>
+  !['Paripe', 'Periperi', 'Plataforma', 'Subúrbio Ferroviário', 'Lobato',
+    'Uruguai', 'Cidade Baixa', 'Saúde', 'Barris', 'Ondina', 'Pelourinho',
+    'Caminho de Areia', 'Massaranduba', 'Fazenda Coutos', 'Garcia',
+    'Salvador Centro'].includes(n.name)
+);
+
+// Cities outside Salvador - if these appear in title WITHOUT a Salvador neighborhood, skip
+const OTHER_CITIES = [
+  'feira de santana', 'camaçari', 'camacari', 'simões filho', 'simoes filho',
+  'lauro de freitas', 'candeias', 'ilhéus', 'ilheus', 'itabuna', 'vitória da conquista',
+  'vitoria da conquista', 'jequié', 'jequie', 'juazeiro', 'alagoinhas',
+  'porto seguro', 'teixeira de freitas', 'barreiras', 'santo antônio de jesus',
+  'santo antonio de jesus', 'são paulo', 'sao paulo', 'rio de janeiro',
+  'brasília', 'brasilia', 'recife', 'fortaleza', 'belo horizonte',
+];
+
 // ========== Crime Classification ==========
 const CRIME_KEYWORDS = {
   homicidio: {
@@ -279,21 +297,26 @@ function processCrimeData(articles) {
     const typeInfo = CRIME_KEYWORDS[crimeType];
     const hood = extractNeighborhood(fullText);
 
-    // If no neighborhood found, assign a random Salvador neighborhood
-    const location = hood || NEIGHBORHOODS[Math.floor(Math.random() * 30)];
+    // If no neighborhood matched, check if this news is about another city — skip it
+    if (!hood) {
+      const lowerText = fullText.toLowerCase();
+      const isOtherCity = OTHER_CITIES.some(city => lowerText.includes(city));
+      if (isOtherCity) continue;
+    }
+
+    // If no neighborhood found, assign from inland-only neighborhoods (avoid coast)
+    const location = hood || INLAND_NEIGHBORHOODS[Math.floor(Math.random() * INLAND_NEIGHBORHOODS.length)];
 
     // Small offset so overlapping markers don't stack
-    // Offset only toward inland (east/south) for coastal neighborhoods to avoid ocean
-    let lat = location.lat + (Math.random() - 0.5) * 0.004;
-    let lng = location.lng + (Math.random() - 0.5) * 0.004;
+    let lat = location.lat + (Math.random() - 0.5) * 0.003;
+    let lng = location.lng + (Math.random() - 0.5) * 0.003;
 
-    // Salvador city bounding box: skip events outside the metro area
-    // Lat: -13.02 ~ -12.85, Lng: -38.52 ~ -38.33
+    // Hard clamp: keep all points within Salvador land area
+    // West boundary (bay coast varies by latitude)
+    const westLimit = lat > -12.92 ? -38.505 : -38.515;
+    if (lng < westLimit) lng = location.lng + Math.random() * 0.003;
+    if (lat < -13.005) lat = location.lat + Math.random() * 0.003;
     if (lat < -13.02 || lat > -12.85 || lng < -38.52 || lng > -38.33) continue;
-
-    // Prevent coastal markers from falling into the bay/ocean
-    if (lng < -38.515) lng = location.lng + Math.random() * 0.004;
-    if (lat < -13.005) lat = location.lat + Math.random() * 0.004;
 
     const hoursAgo = (now - article.pubDate) / 3600000;
     const h = Math.floor(hoursAgo);
