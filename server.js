@@ -55,21 +55,21 @@ const NEIGHBORHOODS = [
   { name: 'Itaigara', lat: -12.9780, lng: -38.4580, aliases: ['itaigara'] },
   { name: 'Caminho de Areia', lat: -12.9290, lng: -38.5000, aliases: ['caminho de areia'] },
   { name: 'Massaranduba', lat: -12.9350, lng: -38.5040, aliases: ['massaranduba'] },
-  { name: 'Cidade Baixa', lat: -12.9550, lng: -38.5150, aliases: ['cidade baixa', 'comércio', 'comercio'] },
+  { name: 'Cidade Baixa', lat: -12.9560, lng: -38.5050, aliases: ['cidade baixa', 'comércio', 'comercio'] },
   { name: 'Salvador Centro', lat: -12.9400, lng: -38.4700, aliases: ['salvador'] },
-  { name: 'Bonfim', lat: -12.9230, lng: -38.5090, aliases: ['bonfim', 'lavagem do bonfim', 'senhor do bonfim', 'monte serrat'] },
-  { name: 'Barra', lat: -12.9990, lng: -38.5130, aliases: ['barra', 'porto da barra', 'farol da barra'] },
+  { name: 'Bonfim', lat: -12.9230, lng: -38.5020, aliases: ['bonfim', 'lavagem do bonfim', 'senhor do bonfim', 'monte serrat'] },
+  { name: 'Barra', lat: -12.9950, lng: -38.5010, aliases: ['barra', 'porto da barra', 'farol da barra'] },
   { name: 'Retiro', lat: -12.9200, lng: -38.4700, aliases: ['retiro'] },
   { name: 'Capelinha', lat: -12.9350, lng: -38.4700, aliases: ['capelinha'] },
   { name: 'Sete de Abril', lat: -12.9100, lng: -38.4550, aliases: ['sete de abril', '7 de abril'] },
   { name: 'Curuzu', lat: -12.9470, lng: -38.4940, aliases: ['curuzu'] },
   { name: 'Federação', lat: -12.9860, lng: -38.5010, aliases: ['federação', 'federacao'] },
-  { name: 'Graça', lat: -12.9910, lng: -38.5100, aliases: ['graça', 'graca'] },
-  { name: 'Canela', lat: -12.9860, lng: -38.5140, aliases: ['canela'] },
-  { name: 'Nazaré', lat: -12.9740, lng: -38.5100, aliases: ['nazaré', 'nazare'] },
-  { name: 'Santa Cruz', lat: -13.0060, lng: -38.5000, aliases: ['santa cruz'] },
-  { name: 'Ribeira', lat: -12.9200, lng: -38.5100, aliases: ['ribeira'] },
-  { name: 'Boa Viagem', lat: -12.9310, lng: -38.5100, aliases: ['boa viagem'] },
+  { name: 'Graça', lat: -12.9910, lng: -38.5050, aliases: ['graça', 'graca'] },
+  { name: 'Canela', lat: -12.9860, lng: -38.5080, aliases: ['canela'] },
+  { name: 'Nazaré', lat: -12.9740, lng: -38.5050, aliases: ['nazaré', 'nazare'] },
+  { name: 'Santa Cruz', lat: -13.0010, lng: -38.4950, aliases: ['santa cruz'] },
+  { name: 'Ribeira', lat: -12.9220, lng: -38.5030, aliases: ['ribeira'] },
+  { name: 'Boa Viagem', lat: -12.9310, lng: -38.5030, aliases: ['boa viagem'] },
   { name: 'IAPI', lat: -12.9350, lng: -38.4870, aliases: ['iapi'] },
   { name: "Caixa D'Água", lat: -12.9400, lng: -38.4930, aliases: ["caixa d'água", "caixa d'agua", 'caixa dagua'] },
   { name: 'Pero Vaz', lat: -12.9390, lng: -38.4960, aliases: ['pero vaz'] },
@@ -85,7 +85,8 @@ const INLAND_NEIGHBORHOODS = NEIGHBORHOODS.filter(n =>
   !['Paripe', 'Periperi', 'Plataforma', 'Subúrbio Ferroviário', 'Lobato',
     'Uruguai', 'Cidade Baixa', 'Saúde', 'Barris', 'Ondina', 'Pelourinho',
     'Caminho de Areia', 'Massaranduba', 'Fazenda Coutos', 'Garcia',
-    'Salvador Centro'].includes(n.name)
+    'Salvador Centro', 'Bonfim', 'Barra', 'Ribeira', 'Boa Viagem',
+    'Graça', 'Canela', 'Santa Cruz', 'Nazaré'].includes(n.name)
 );
 
 // Cities outside Salvador - if these appear in title WITHOUT a Salvador neighborhood, skip
@@ -460,11 +461,21 @@ function processCrimeData(articles, articleBodies) {
       lng = hood.lng + (Math.random() - 0.5) * 0.003;
       neighborhoodName = hood.name;
 
-      // Clamp to keep on land
-      const westLimit = lat > -12.92 ? -38.505 : -38.515;
-      if (lng < westLimit) lng = hood.lng + Math.random() * 0.003;
-      if (lat < -13.005) lat = hood.lat + Math.random() * 0.003;
-      if (lat < -13.02 || lat > -12.85 || lng < -38.52 || lng > -38.33) continue;
+      // Salvador coastline boundary check (peninsula shape)
+      // The west coast (Baía de Todos os Santos) follows a curve:
+      //   North (lat > -12.92): west limit ~ -38.505
+      //   Mid (lat -12.92 to -12.97): west limit ~ -38.510
+      //   South (lat -12.97 to -13.00): west limit ~ -38.505 (peninsula narrows)
+      //   Tip (lat < -13.00): west limit ~ -38.500 (very narrow)
+      let westLimit;
+      if (lat > -12.92) westLimit = -38.505;
+      else if (lat > -12.97) westLimit = -38.510;
+      else if (lat > -13.00) westLimit = -38.505;
+      else westLimit = -38.498;
+
+      if (lng < westLimit) lng = hood.lng + Math.abs(Math.random() * 0.002);
+      if (lat < -13.003) lat = hood.lat + Math.abs(Math.random() * 0.002);
+      if (lat < -13.01 || lat > -12.85 || lng < -38.52 || lng > -38.33) continue;
     }
 
     const hoursAgo = (now - article.pubDate) / 3600000;
