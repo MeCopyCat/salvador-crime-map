@@ -224,6 +224,11 @@
             line-height: 1.6;
         }
 
+        .crime-card.no-location {
+            opacity: 0.65;
+            border-left: 3px solid #555;
+        }
+
         .no-data {
             padding: 40px 20px;
             text-align: center;
@@ -376,14 +381,19 @@ function renderList(filteredCrimes) {
 
     list.innerHTML = filteredCrimes.map(c => {
         const color = SEVERITY_COLORS[c.severity];
-        const geoClass = c.neighborhoodMatched ? '' : ' approx';
-        const geoLabel = c.neighborhoodMatched ? '精确' : '大致';
+        const hasLocation = c.lat !== null && c.lng !== null;
+        let geoTag = '';
+        if (hasLocation) {
+            geoTag = `<span class="geo-tag">精确</span>`;
+        } else {
+            geoTag = `<span class="geo-tag approx">位置未知</span>`;
+        }
         return `
-        <div class="crime-card" data-id="${c.id}">
+        <div class="crime-card${hasLocation ? '' : ' no-location'}" data-id="${c.id}">
             <div class="crime-type">
                 <span class="severity-dot" style="background:${color}"></span>
-                ${c.label} - ${c.neighborhood}
-                <span class="geo-tag${geoClass}">${geoLabel}</span>
+                ${c.label}${hasLocation ? ' - ' + c.neighborhood : ''}
+                ${geoTag}
             </div>
             <div class="crime-title">${c.title}</div>
             <div class="crime-meta">
@@ -439,7 +449,7 @@ async function loadData() {
 
         crimes = data.crimes;
         clearMarkers();
-        markers = crimes.map(c => createMarker(c));
+        markers = crimes.filter(c => c.lat !== null && c.lng !== null).map(c => createMarker(c));
 
         // Update stats
         document.getElementById('totalCount').textContent = crimes.length;
@@ -448,9 +458,11 @@ async function loadData() {
         const sources = new Set(crimes.map(c => c.source));
         document.getElementById('sourceCount').textContent = sources.size;
 
+        const locatedCount = crimes.filter(c => c.lat !== null).length;
+        const unlocatedCount = crimes.length - locatedCount;
         const fetchTime = new Date(data.fetchedAt);
         document.getElementById('updateInfo').textContent =
-            `更新于 ${fetchTime.toLocaleTimeString('zh-CN')} | ${crimes.length} 条实时新闻`;
+            `更新于 ${fetchTime.toLocaleTimeString('zh-CN')} | ${locatedCount} 条已定位, ${unlocatedCount} 条位置未知`;
 
         renderList(crimes);
         activeFilter = 'all';

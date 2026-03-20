@@ -304,19 +304,22 @@ function processCrimeData(articles) {
       if (isOtherCity) continue;
     }
 
-    // If no neighborhood found, assign from inland-only neighborhoods (avoid coast)
-    const location = hood || INLAND_NEIGHBORHOODS[Math.floor(Math.random() * INLAND_NEIGHBORHOODS.length)];
+    let lat = null;
+    let lng = null;
+    let neighborhoodName = '位置未知';
 
-    // Small offset so overlapping markers don't stack
-    let lat = location.lat + (Math.random() - 0.5) * 0.003;
-    let lng = location.lng + (Math.random() - 0.5) * 0.003;
+    if (hood) {
+      // Matched a neighborhood — use its coordinates with small offset
+      lat = hood.lat + (Math.random() - 0.5) * 0.003;
+      lng = hood.lng + (Math.random() - 0.5) * 0.003;
+      neighborhoodName = hood.name;
 
-    // Hard clamp: keep all points within Salvador land area
-    // West boundary (bay coast varies by latitude)
-    const westLimit = lat > -12.92 ? -38.505 : -38.515;
-    if (lng < westLimit) lng = location.lng + Math.random() * 0.003;
-    if (lat < -13.005) lat = location.lat + Math.random() * 0.003;
-    if (lat < -13.02 || lat > -12.85 || lng < -38.52 || lng > -38.33) continue;
+      // Clamp to keep on land
+      const westLimit = lat > -12.92 ? -38.505 : -38.515;
+      if (lng < westLimit) lng = hood.lng + Math.random() * 0.003;
+      if (lat < -13.005) lat = hood.lat + Math.random() * 0.003;
+      if (lat < -13.02 || lat > -12.85 || lng < -38.52 || lng > -38.33) continue;
+    }
 
     const hoursAgo = (now - article.pubDate) / 3600000;
     const h = Math.floor(hoursAgo);
@@ -331,7 +334,7 @@ function processCrimeData(articles) {
       labelPt: typeInfo.labelPt,
       severity: typeInfo.severity,
       radius: typeInfo.radius,
-      neighborhood: location.name,
+      neighborhood: neighborhoodName,
       neighborhoodMatched: !!hood,
       title: article.title,
       description: article.description || article.title,
