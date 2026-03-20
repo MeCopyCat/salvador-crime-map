@@ -56,7 +56,7 @@ const NEIGHBORHOODS = [
   { name: 'Caminho de Areia', lat: -12.9290, lng: -38.5000, aliases: ['caminho de areia'] },
   { name: 'Massaranduba', lat: -12.9350, lng: -38.5040, aliases: ['massaranduba'] },
   { name: 'Cidade Baixa', lat: -12.9560, lng: -38.5050, aliases: ['cidade baixa', 'comércio', 'comercio'] },
-  { name: 'Salvador Centro', lat: -12.9400, lng: -38.4700, aliases: ['salvador'] },
+  { name: 'Salvador Centro', lat: -12.9400, lng: -38.4700, aliases: ['centro de salvador', 'centro salvador', 'região central de salvador'] },
   { name: 'Bonfim', lat: -12.9230, lng: -38.5020, aliases: ['bonfim', 'lavagem do bonfim', 'senhor do bonfim', 'monte serrat'] },
   { name: 'Barra', lat: -12.9950, lng: -38.5010, aliases: ['barra', 'porto da barra', 'farol da barra'] },
   { name: 'Retiro', lat: -12.9200, lng: -38.4700, aliases: ['retiro'] },
@@ -91,12 +91,23 @@ const INLAND_NEIGHBORHOODS = NEIGHBORHOODS.filter(n =>
 
 // Cities outside Salvador - if these appear in title WITHOUT a Salvador neighborhood, skip
 const OTHER_CITIES = [
+  // Bahia state cities (not Salvador)
   'feira de santana', 'camaçari', 'camacari', 'simões filho', 'simoes filho',
   'lauro de freitas', 'candeias', 'ilhéus', 'ilheus', 'itabuna', 'vitória da conquista',
   'vitoria da conquista', 'jequié', 'jequie', 'juazeiro', 'alagoinhas',
   'porto seguro', 'teixeira de freitas', 'barreiras', 'santo antônio de jesus',
-  'santo antonio de jesus', 'são paulo', 'sao paulo', 'rio de janeiro',
-  'brasília', 'brasilia', 'recife', 'fortaleza', 'belo horizonte',
+  'santo antonio de jesus', 'canápolis', 'canapolis', 'brumado', 'ipiaú', 'ipiau',
+  'itacaré', 'itacare', 'jaguara', 'muritiba', 'dias d\'ávila', 'dias d\'avila',
+  'dias davila', 'serrinha', 'cruz das almas', 'eunápolis', 'eunapolis',
+  'luís eduardo magalhães', 'luis eduardo magalhaes', 'senhor do bonfim',
+  'jacobina', 'irecê', 'irece', 'valença', 'valenca', 'santo amaro',
+  'itaberaba', 'guanambi', 'conceição do coité', 'conceicao do coite',
+  'esplanada', 'ribeira do pombal', 'paulo afonso', 'tucano', 'jeremoabo',
+  'sertão', 'sertao', 'interior da bahia',
+  // Other states
+  'são paulo', 'sao paulo', 'rio de janeiro', 'brasília', 'brasilia',
+  'recife', 'fortaleza', 'belo horizonte', 'curitiba', 'manaus', 'belém', 'belem',
+  'goiânia', 'goiania', 'espírito santo', 'espirito santo', 'minas gerais',
 ];
 
 // ========== Crime Classification ==========
