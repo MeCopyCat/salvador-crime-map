@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salvador Crime Map - 萨尔瓦多实时犯罪地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+
+        #header {
+            background: linear-gradient(135deg, #16213e, #0f3460);
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            position: relative;
+        }
+        #header h1 { font-size: 22px; color: #e94560; }
+        #header .subtitle { font-size: 13px; color: #a0a0b0; margin-top: 2px; }
+        #header .stats {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        .stat-box {
+            text-align: center;
+            background: rgba(255,255,255,0.05);
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .stat-box .num { font-size: 22px; font-weight: bold; color: #e94560; }
+        .stat-box .label { font-size: 11px; color: #888; }
+        .refresh-btn {
+            background: rgba(233,69,96,0.15);
+            border: 1px solid #e94560;
+            color: #e94560;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .refresh-btn:hover { background: #e94560; color: #fff; }
+        .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .source-tag {
+            display: inline-block;
+            background: rgba(233,69,96,0.15);
+            color: #e94560;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            margin-top: 4px;
+        }
+
+        #container {
+            display: flex;
+            height: calc(100vh - 68px);
+        }
+
+        #map { flex: 1; z-index: 1; }
+
+        #sidebar {
+            width: 380px;
+            background: #16213e;
+            overflow-y: auto;
+            border-left: 1px solid #0f3460;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            padding: 14px 16px;
+            font-size: 15px;
+            font-weight: 600;
+            background: #0f3460;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .legend {
+            display: flex;
+            gap: 10px;
+            padding: 10px 16px;
+            background: rgba(0,0,0,0.15);
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: #aaa;
+        }
+        .legend-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .crime-card {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .crime-card:hover { background: rgba(233,69,96,0.1); }
+        .crime-card .crime-type {
+            font-weight: 600;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .crime-card .severity-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+        .crime-card .crime-title {
+            font-size: 12px;
+            color: #ccc;
+            margin-top: 5px;
+            line-height: 1.5;
+        }
+        .crime-card .crime-meta {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .crime-card .news-source {
+            color: #e94560;
+            font-size: 10px;
+            background: rgba(233,69,96,0.1);
+            padding: 1px 6px;
+            border-radius: 3px;
+        }
+        .crime-card .news-link {
+            font-size: 11px;
+            color: #4a9eff;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 4px;
+        }
+        .crime-card .news-link:hover { text-decoration: underline; }
+        .crime-card .geo-tag {
+            font-size: 10px;
+            color: #4caf50;
+            background: rgba(76,175,80,0.1);
+            padding: 1px 6px;
+            border-radius: 3px;
+        }
+        .crime-card .geo-tag.approx {
+            color: #ff9800;
+            background: rgba(255,152,0,0.1);
+        }
+
+        .filter-bar {
+            padding: 10px 16px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            background: rgba(0,0,0,0.1);
+        }
+        .filter-btn {
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.15);
+            background: transparent;
+            color: #ccc;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-btn.active {
+            background: #e94560;
+            border-color: #e94560;
+            color: #fff;
+        }
+        .filter-btn:hover { border-color: #e94560; }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(26,26,46,0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .spinner {
+            width: 48px; height: 48px;
+            border: 4px solid #0f3460;
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { margin-top: 16px; color: #aaa; font-size: 14px; }
+        .loading-sub { margin-top: 8px; color: #666; font-size: 12px; }
+
+        .error-box {
+            padding: 20px;
+            margin: 16px;
+            background: rgba(233,69,96,0.1);
+            border: 1px solid #e94560;
+            border-radius: 8px;
+            color: #e94560;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .no-data {
+            padding: 40px 20px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            #container { flex-direction: column; }
+            #sidebar { width: 100%; height: 40vh; }
+            #map { height: 60vh; }
+            #header { flex-wrap: wrap; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">正在从新闻源获取萨尔瓦多实时犯罪数据...</div>
+    <div class="loading-sub">数据来源: Google News / GDELT Project</div>
+</div>
+
+<div id="header">
+    <div>
+        <h1>Salvador Crime Map</h1>
+        <div class="subtitle">巴西萨尔瓦多市 - 近24小时恶性犯罪事件 (实时新闻数据)</div>
+    </div>
+    <div class="stats">
+        <div class="stat-box">
+            <div class="num" id="totalCount">-</div>
+            <div class="label">事件总数</div>
+        </div>
+        <div class="stat-box">
+            <div class="num" id="criticalCount">-</div>
+            <div class="label">严重事件</div>
+        </div>
+        <div class="stat-box">
+            <div class="num" id="sourceCount">-</div>
+            <div class="label">新闻来源</div>
+        </div>
+        <button class="refresh-btn" id="refreshBtn" onclick="loadData()">刷新数据</button>
+    </div>
+</div>
+
+<div id="container">
+    <div id="map"></div>
+    <div id="sidebar">
+        <div class="sidebar-header">
+            事件列表 (按严重程度排序)
+            <div style="font-size:11px;color:#888;font-weight:normal;margin-top:2px" id="updateInfo"></div>
+        </div>
+        <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#8b0000"></div>极度严重(5)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#dc143c"></div>严重(4)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#e94560"></div>较重(3)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b"></div>中等(2)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ffa07a"></div>一般(1)</div>
+        </div>
+        <div class="filter-bar" id="filterBar">
+            <button class="filter-btn active" data-filter="all">全部</button>
+            <button class="filter-btn" data-filter="homicidio">凶杀</button>
+            <button class="filter-btn" data-filter="latrocinio">抢劫致死</button>
+            <button class="filter-btn" data-filter="assalto">持械抢劫</button>
+            <button class="filter-btn" data-filter="tiroteio">枪击</button>
+            <button class="filter-btn" data-filter="sequestro">绑架</button>
+            <button class="filter-btn" data-filter="estupro">性侵</button>
+            <button class="filter-btn" data-filter="trafico">毒品交火</button>
+        </div>
+        <div id="crimeList"></div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const SEVERITY_COLORS = {
+    5: '#8b0000',
+    4: '#dc143c',
+    3: '#e94560',
+    2: '#ff6b6b',
+    1: '#ffa07a',
+};
+
+const map = L.map('map', {
+    center: [-12.9714, -38.5014],
+    zoom: 12,
+    zoomControl: true,
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 19,
+}).addTo(map);
+
+let crimes = [];
+let markers = [];
+let activeFilter = 'all';
+
+function createMarker(crime) {
+    const color = SEVERITY_COLORS[crime.severity] || '#ffa07a';
+    const marker = L.circleMarker([crime.lat, crime.lng], {
+        radius: crime.radius,
+        fillColor: color,
+        color: '#fff',
+        weight: 1.5,
+        opacity: 0.9,
+        fillOpacity: 0.75,
+    }).addTo(map);
+
+    const geoInfo = crime.neighborhoodMatched
+        ? `<span style="color:#4caf50;font-size:11px">&#9679; 精确定位</span>`
+        : `<span style="color:#ff9800;font-size:11px">&#9675; 大致区域</span>`;
+
+    marker.bindPopup(`
+        <div style="font-family:sans-serif;min-width:240px;max-width:320px">
+            <div style="font-size:15px;font-weight:700;color:${color};margin-bottom:4px">
+                ${crime.label} (${crime.labelPt})
+            </div>
+            <div style="font-size:12px;color:#555;margin-bottom:6px">
+                <b>地点:</b> ${crime.neighborhood} ${geoInfo}<br>
+                <b>时间:</b> ${crime.timeStr}<br>
+                <b>来源:</b> ${crime.source}
+            </div>
+            <div style="font-size:13px;color:#333;line-height:1.6;margin:8px 0;border-left:3px solid ${color};padding-left:8px">
+                ${crime.title}
+            </div>
+            <div style="margin-top:6px;font-size:11px;color:#999">
+                严重等级: ${'★'.repeat(crime.severity)}${'☆'.repeat(5 - crime.severity)}
+            </div>
+            ${crime.link ? `<a href="${crime.link}" target="_blank" rel="noopener" style="font-size:11px;color:#4a9eff;display:block;margin-top:6px">查看原始报道 →</a>` : ''}
+        </div>
+    `, { maxWidth: 340 });
+
+    marker.crimeData = crime;
+    return marker;
+}
+
+function clearMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+}
+
+function renderList(filteredCrimes) {
+    const list = document.getElementById('crimeList');
+
+    if (filteredCrimes.length === 0) {
+        list.innerHTML = '<div class="no-data">暂无匹配的犯罪事件数据</div>';
+        return;
+    }
+
+    list.innerHTML = filteredCrimes.map(c => {
+        const color = SEVERITY_COLORS[c.severity];
+        const geoClass = c.neighborhoodMatched ? '' : ' approx';
+        const geoLabel = c.neighborhoodMatched ? '精确' : '大致';
+        return `
+        <div class="crime-card" data-id="${c.id}">
+            <div class="crime-type">
+                <span class="severity-dot" style="background:${color}"></span>
+                ${c.label} - ${c.neighborhood}
+                <span class="geo-tag${geoClass}">${geoLabel}</span>
+            </div>
+            <div class="crime-title">${c.title}</div>
+            <div class="crime-meta">
+                <span>${c.timeStr}</span>
+                <span class="news-source">${c.source}</span>
+            </div>
+            ${c.link ? `<a class="news-link" href="${c.link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">查看原始报道 →</a>` : ''}
+        </div>`;
+    }).join('');
+
+    list.querySelectorAll('.crime-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const id = parseInt(card.dataset.id);
+            const marker = markers.find(m => m.crimeData.id === id);
+            if (marker) {
+                map.setView(marker.getLatLng(), 15, { animate: true });
+                marker.openPopup();
+            }
+        });
+    });
+}
+
+function applyFilter(filter) {
+    activeFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+
+    markers.forEach(m => {
+        const show = filter === 'all' || m.crimeData.type === filter;
+        if (show) m.addTo(map);
+        else map.removeLayer(m);
+    });
+
+    const filtered = filter === 'all' ? crimes : crimes.filter(c => c.type === filter);
+    renderList(filtered);
+}
+
+async function loadData() {
+    const refreshBtn = document.getElementById('refreshBtn');
+    const loadingEl = document.getElementById('loading');
+
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = '加载中...';
+
+    try {
+        const res = await window.fetch('/api/crimes');
+        const data = await res.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to fetch data');
+        }
+
+        crimes = data.crimes;
+        clearMarkers();
+        markers = crimes.map(c => createMarker(c));
+
+        // Update stats
+        document.getElementById('totalCount').textContent = crimes.length;
+        document.getElementById('criticalCount').textContent = crimes.filter(c => c.severity >= 4).length;
+
+        const sources = new Set(crimes.map(c => c.source));
+        document.getElementById('sourceCount').textContent = sources.size;
+
+        const fetchTime = new Date(data.fetchedAt);
+        document.getElementById('updateInfo').textContent =
+            `更新于 ${fetchTime.toLocaleTimeString('zh-CN')} | ${crimes.length} 条实时新闻`;
+
+        renderList(crimes);
+        activeFilter = 'all';
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === 'all');
+        });
+
+        if (crimes.length === 0) {
+            document.getElementById('crimeList').innerHTML = `
+                <div class="error-box">
+                    近24小时内未抓取到萨尔瓦多犯罪新闻数据。<br><br>
+                    可能原因：<br>
+                    - 新闻源暂时无法访问<br>
+                    - 网络连接问题<br>
+                    - 最近24小时内无相关报道<br><br>
+                    请稍后点击"刷新数据"重试。
+                </div>`;
+        }
+
+    } catch (error) {
+        console.error('Error loading data:', error);
+        document.getElementById('crimeList').innerHTML = `
+            <div class="error-box">
+                数据加载失败: ${error.message}<br><br>
+                请确保后端服务已启动 (npm start)
+            </div>`;
+    } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '刷新数据';
+        loadingEl.classList.add('hidden');
+    }
+}
+
+// Filter buttons
+document.getElementById('filterBar').addEventListener('click', e => {
+    if (e.target.classList.contains('filter-btn')) {
+        applyFilter(e.target.dataset.filter);
+    }
+});
+
+// Initial load
+loadData();
+</script>
+</body>
+</html>
