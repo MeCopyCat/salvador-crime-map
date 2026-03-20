@@ -11,7 +11,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ========== Salvador Neighborhood Geocoding ==========
 const NEIGHBORHOODS = [
-  { name: 'Pelourinho', lat: -12.9714, lng: -38.5104, aliases: ['pelourinho', 'centro histórico', 'centro historico'] },
+  { name: 'Pelourinho', lat: -12.9714, lng: -38.5104, aliases: ['pelourinho', 'centro histórico', 'centro historico', 'largo do pelourinho'] },
   { name: 'Liberdade', lat: -12.9437, lng: -38.4969, aliases: ['liberdade'] },
   { name: 'Sussuarana', lat: -12.9190, lng: -38.4480, aliases: ['sussuarana'] },
   { name: 'Itapuã', lat: -12.9390, lng: -38.3740, aliases: ['itapuã', 'itapua'] },
@@ -57,6 +57,27 @@ const NEIGHBORHOODS = [
   { name: 'Massaranduba', lat: -12.9350, lng: -38.5040, aliases: ['massaranduba'] },
   { name: 'Cidade Baixa', lat: -12.9550, lng: -38.5150, aliases: ['cidade baixa', 'comércio', 'comercio'] },
   { name: 'Salvador Centro', lat: -12.9400, lng: -38.4700, aliases: ['salvador'] },
+  { name: 'Bonfim', lat: -12.9230, lng: -38.5090, aliases: ['bonfim', 'lavagem do bonfim', 'senhor do bonfim', 'monte serrat'] },
+  { name: 'Barra', lat: -12.9990, lng: -38.5130, aliases: ['barra', 'porto da barra', 'farol da barra'] },
+  { name: 'Retiro', lat: -12.9200, lng: -38.4700, aliases: ['retiro'] },
+  { name: 'Capelinha', lat: -12.9350, lng: -38.4700, aliases: ['capelinha'] },
+  { name: 'Sete de Abril', lat: -12.9100, lng: -38.4550, aliases: ['sete de abril', '7 de abril'] },
+  { name: 'Curuzu', lat: -12.9470, lng: -38.4940, aliases: ['curuzu'] },
+  { name: 'Federação', lat: -12.9860, lng: -38.5010, aliases: ['federação', 'federacao'] },
+  { name: 'Graça', lat: -12.9910, lng: -38.5100, aliases: ['graça', 'graca'] },
+  { name: 'Canela', lat: -12.9860, lng: -38.5140, aliases: ['canela'] },
+  { name: 'Nazaré', lat: -12.9740, lng: -38.5100, aliases: ['nazaré', 'nazare'] },
+  { name: 'Santa Cruz', lat: -13.0060, lng: -38.5000, aliases: ['santa cruz'] },
+  { name: 'Ribeira', lat: -12.9200, lng: -38.5100, aliases: ['ribeira'] },
+  { name: 'Boa Viagem', lat: -12.9310, lng: -38.5100, aliases: ['boa viagem'] },
+  { name: 'IAPI', lat: -12.9350, lng: -38.4870, aliases: ['iapi'] },
+  { name: "Caixa D'Água", lat: -12.9400, lng: -38.4930, aliases: ["caixa d'água", "caixa d'agua", 'caixa dagua'] },
+  { name: 'Pero Vaz', lat: -12.9390, lng: -38.4960, aliases: ['pero vaz'] },
+  { name: 'Vila Canária', lat: -12.9600, lng: -38.4520, aliases: ['vila canária', 'vila canaria'] },
+  { name: 'Jardim Armação', lat: -12.9750, lng: -38.4320, aliases: ['jardim armação', 'jardim armacao'] },
+  { name: 'São Cristóvão', lat: -12.9230, lng: -38.4350, aliases: ['são cristóvão', 'sao cristovao'] },
+  { name: 'Atakarejo', lat: -12.9320, lng: -38.4360, aliases: ['atakarejo'] },
+  { name: 'Piatã', lat: -12.9510, lng: -38.3900, aliases: ['piatã', 'piata'] },
 ];
 
 // Inland-only neighborhoods for random assignment (exclude coastal ones that risk ocean placement)
@@ -201,6 +222,81 @@ function fetch(url) {
   });
 }
 
+// ========== Article Body Fetching ==========
+function extractTextFromHTML(html) {
+  // Remove script, style, nav, header, footer tags and their content
+  let text = html.replace(/<(script|style|nav|header|footer|aside|iframe|noscript)[^>]*>[\s\S]*?<\/\1>/gi, ' ');
+  // Remove all HTML tags
+  text = text.replace(/<[^>]+>/g, ' ');
+  // Decode common HTML entities
+  text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+             .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  // Collapse whitespace
+  text = text.replace(/\s+/g, ' ').trim();
+  return text;
+}
+
+async function fetchArticleBody(url, timeoutMs = 10000) {
+  try {
+    // Google News links are redirects — follow them
+    const html = await new Promise((resolve, reject) => {
+      const client = url.startsWith('https') ? https : http;
+      const doRequest = (reqUrl, redirects = 0) => {
+        if (redirects > 5) return reject(new Error('too many redirects'));
+        const req = client.get(reqUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html',
+            'Accept-Language': 'pt-BR,pt;q=0.9',
+          },
+        }, res => {
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            return doRequest(res.headers.location, redirects + 1);
+          }
+          if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+          let data = '';
+          res.setEncoding('utf8');
+          // Limit to first 200KB to avoid huge pages
+          let bytes = 0;
+          res.on('data', chunk => {
+            bytes += chunk.length;
+            if (bytes < 200000) data += chunk;
+          });
+          res.on('end', () => resolve(data));
+        });
+        req.on('error', reject);
+        req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error('timeout')); });
+      };
+      doRequest(url);
+    });
+    return extractTextFromHTML(html);
+  } catch (e) {
+    return ''; // Silently fail — we still have title/description
+  }
+}
+
+// Fetch article bodies concurrently — only for articles with direct links (not Google News redirects)
+async function fetchArticleBodies(articles, concurrency = 8) {
+  const results = new Array(articles.length).fill('');
+  const fetchable = articles
+    .map((a, i) => ({ index: i, article: a }))
+    .filter(x => x.article.link && x.article.hasDirectLink && !x.article.link.includes('news.google.com'));
+
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < fetchable.length) {
+      const { index, article } = fetchable[cursor++];
+      results[index] = await fetchArticleBody(article.link);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, fetchable.length) }, () => worker());
+  await Promise.all(workers);
+  console.log(`  Fetched ${fetchable.length} article bodies (skipped ${articles.length - fetchable.length} Google News links)`);
+  return results;
+}
+
 async function fetchGoogleNewsRSS(query) {
   const encoded = encodeURIComponent(query);
   const url = `https://news.google.com/rss/search?q=${encoded}+when:1d&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
@@ -223,6 +319,49 @@ async function fetchGoogleNewsRSS(query) {
   }
 }
 
+async function fetchG1Bahia() {
+  const url = 'https://g1.globo.com/rss/g1/ba/bahia/';
+  try {
+    const xml = await fetch(url);
+    const result = await parseStringPromise(xml, { explicitArray: false });
+    const channel = result?.rss?.channel;
+    if (!channel?.item) return [];
+    const items = Array.isArray(channel.item) ? channel.item : [channel.item];
+    return items.map(item => ({
+      title: item.title || '',
+      description: (item.description || '').replace(/<[^>]*>/g, ''),
+      link: item.link || '',
+      pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
+      source: 'G1 Bahia',
+      hasDirectLink: true, // Direct link — can fetch body
+    }));
+  } catch (e) {
+    console.error('Error fetching G1 Bahia:', e.message);
+    return [];
+  }
+}
+
+async function fetchRSSDirect(name, url) {
+  try {
+    const xml = await fetch(url);
+    const result = await parseStringPromise(xml, { explicitArray: false });
+    const channel = result?.rss?.channel;
+    if (!channel?.item) return [];
+    const items = Array.isArray(channel.item) ? channel.item : [channel.item];
+    return items.map(item => ({
+      title: item.title || '',
+      description: (item.description || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' '),
+      link: item.link || '',
+      pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
+      source: name,
+      hasDirectLink: true,
+    }));
+  } catch (e) {
+    console.error(`Error fetching ${name}:`, e.message);
+    return [];
+  }
+}
+
 async function fetchGDELT() {
   // GDELT GKG API: search for crime events in Salvador, Bahia
   const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=Salvador%20Bahia%20(crime%20OR%20homicidio%20OR%20assalto%20OR%20tiroteio%20OR%20violencia)&mode=artlist&maxrecords=50&format=json&sourcelang=por&timespan=1d';
@@ -236,6 +375,7 @@ async function fetchGDELT() {
       link: a.url || '',
       pubDate: a.seendate ? new Date(a.seendate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')) : new Date(),
       source: a.domain || 'GDELT',
+      hasDirectLink: true,
     }));
   } catch (e) {
     console.error('Error fetching GDELT:', e.message);
@@ -256,6 +396,9 @@ async function fetchAllNews() {
 
   const promises = [
     ...queries.map(q => fetchGoogleNewsRSS(q)),
+    fetchG1Bahia(),
+    fetchRSSDirect('Acorda Cidade', 'https://www.acordacidade.com.br/feed'),
+    fetchRSSDirect('Bocao News', 'https://www.bocaonews.com.br/feed'),
     fetchGDELT(),
   ];
 
@@ -279,15 +422,17 @@ async function fetchAllNews() {
   return allArticles;
 }
 
-function processCrimeData(articles) {
+function processCrimeData(articles, articleBodies) {
   const crimes = [];
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 3600 * 1000);
 
   for (let i = 0; i < articles.length; i++) {
     const article = articles[i];
+    const bodyText = articleBodies[i] || '';
     const fullText = `${article.title} ${article.description}`;
-    const crimeType = classifyCrime(fullText);
+    // Use title+description for classification, and also try body for location
+    const crimeType = classifyCrime(fullText) || classifyCrime(bodyText);
 
     if (!crimeType) continue; // Skip non-crime articles
 
@@ -295,12 +440,13 @@ function processCrimeData(articles) {
     if (article.pubDate < oneDayAgo) continue;
 
     const typeInfo = CRIME_KEYWORDS[crimeType];
-    const hood = extractNeighborhood(fullText);
+    // Try to extract neighborhood: first from title/description, then from body
+    const hood = extractNeighborhood(fullText) || extractNeighborhood(bodyText);
 
     // If no neighborhood matched, check if this news is about another city — skip it
     if (!hood) {
-      const lowerText = fullText.toLowerCase();
-      const isOtherCity = OTHER_CITIES.some(city => lowerText.includes(city));
+      const allText = `${fullText} ${bodyText}`.toLowerCase();
+      const isOtherCity = OTHER_CITIES.some(city => allText.includes(city));
       if (isOtherCity) continue;
     }
 
@@ -369,8 +515,45 @@ app.get('/api/crimes', async (req, res) => {
     const articles = await fetchAllNews();
     console.log(`Fetched ${articles.length} total articles`);
 
-    const crimes = processCrimeData(articles);
-    console.log(`Classified ${crimes.length} crime events`);
+    // First pass: classify with title/description only (no body fetch yet)
+    const emptyBodies = new Array(articles.length).fill('');
+    const firstPassCrimes = processCrimeData(articles, emptyBodies);
+    const unlocated = firstPassCrimes.filter(c => c.lat === null);
+    console.log(`First pass: ${firstPassCrimes.length} crimes, ${firstPassCrimes.length - unlocated.length} located, ${unlocated.length} need body fetch`);
+
+    // Second pass: fetch bodies ONLY for crime-related but unlocated articles with direct links
+    const locatedTitles = new Set(firstPassCrimes.filter(c => c.lat !== null).map(c => c.title));
+    const crimeRelatedTitles = new Set(firstPassCrimes.map(c => c.title));
+    const articlesToFetch = articles.map((a) => {
+      // Skip if: no direct link, is Google News redirect, G1 SPA, already located, or not crime-related
+      if (!a.hasDirectLink || !a.link || a.link.includes('news.google.com') || a.link.includes('g1.globo.com') || a.link.includes('globo.com')) {
+        return { ...a, _skip: true };
+      }
+      if (locatedTitles.has(a.title)) {
+        return { ...a, _skip: true };
+      }
+      // Only fetch body if this article was classified as crime in first pass
+      const isCrime = crimeRelatedTitles.has(a.title) || classifyCrime(`${a.title} ${a.description}`);
+      if (!isCrime) {
+        return { ...a, _skip: true };
+      }
+      return a;
+    });
+
+    const needFetch = articlesToFetch.filter(a => !a._skip).length;
+    console.log(`Fetching ${needFetch} article bodies for location extraction...`);
+
+    const articleBodies = needFetch > 0
+      ? await fetchArticleBodies(articlesToFetch.map(a => a._skip ? { ...a, link: null } : a))
+      : emptyBodies;
+
+    // Final pass: re-process with bodies
+    const crimes = needFetch > 0
+      ? processCrimeData(articles, articleBodies)
+      : firstPassCrimes;
+
+    const locatedCount = crimes.filter(c => c.lat !== null).length;
+    console.log(`Final: ${crimes.length} crime events (${locatedCount} located, ${crimes.length - locatedCount} unlocated)`);
 
     const response = {
       success: true,

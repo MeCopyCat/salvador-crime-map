@@ -12,7 +12,8 @@
       "Bash(git commit:*)",
       "Bash(gh repo:*)",
       "Bash(python3 -c \":*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(node -e \":*)"
     ]
   }
 }
