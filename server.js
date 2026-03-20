@@ -56,12 +56,7 @@ const NEIGHBORHOODS = [
   { name: 'Caminho de Areia', lat: -12.9290, lng: -38.5000, aliases: ['caminho de areia'] },
   { name: 'Massaranduba', lat: -12.9350, lng: -38.5040, aliases: ['massaranduba'] },
   { name: 'Cidade Baixa', lat: -12.9550, lng: -38.5150, aliases: ['cidade baixa', 'comércio', 'comercio'] },
-  { name: 'Lauro de Freitas', lat: -12.8780, lng: -38.3270, aliases: ['lauro de freitas'] },
-  { name: 'Simões Filho', lat: -12.7860, lng: -38.4040, aliases: ['simões filho', 'simoes filho'] },
-  { name: 'Camaçari', lat: -12.6980, lng: -38.3240, aliases: ['camaçari', 'camacari'] },
-  { name: 'Candeias', lat: -12.6720, lng: -38.5480, aliases: ['candeias'] },
-  { name: 'Feira de Santana', lat: -12.2530, lng: -38.9660, aliases: ['feira de santana'] },
-  { name: 'San Salvador', lat: -12.9400, lng: -38.4700, aliases: ['salvador'] },
+  { name: 'Salvador Centro', lat: -12.9400, lng: -38.4700, aliases: ['salvador'] },
 ];
 
 // ========== Crime Classification ==========
@@ -288,8 +283,17 @@ function processCrimeData(articles) {
     const location = hood || NEIGHBORHOODS[Math.floor(Math.random() * 30)];
 
     // Small offset so overlapping markers don't stack
-    const lat = location.lat + (Math.random() - 0.5) * 0.005;
-    const lng = location.lng + (Math.random() - 0.5) * 0.005;
+    // Offset only toward inland (east/south) for coastal neighborhoods to avoid ocean
+    let lat = location.lat + (Math.random() - 0.5) * 0.004;
+    let lng = location.lng + (Math.random() - 0.5) * 0.004;
+
+    // Salvador city bounding box: skip events outside the metro area
+    // Lat: -13.02 ~ -12.85, Lng: -38.52 ~ -38.33
+    if (lat < -13.02 || lat > -12.85 || lng < -38.52 || lng > -38.33) continue;
+
+    // Prevent coastal markers from falling into the bay/ocean
+    if (lng < -38.515) lng = location.lng + Math.random() * 0.004;
+    if (lat < -13.005) lat = location.lat + Math.random() * 0.004;
 
     const hoursAgo = (now - article.pubDate) / 3600000;
     const h = Math.floor(hoursAgo);
